@@ -3,6 +3,7 @@ package com.example.compsysten.service;
 import com.example.compsysten.model.Complaint;
 import com.example.compsysten.model.User;
 import com.example.compsysten.repository.ComplaintRepository;
+import com.example.compsysten.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -13,9 +14,11 @@ import java.util.Optional;
 public class ComplaintService {
 
     private final ComplaintRepository complaintRepository;
+    private final UserRepository userRepository;
 
-    public ComplaintService(ComplaintRepository complaintRepository) {
+    public ComplaintService(ComplaintRepository complaintRepository, UserRepository userRepository) {
         this.complaintRepository = complaintRepository;
+        this.userRepository = userRepository;
     }
 
     public List<Complaint> getAllComplaints() {
@@ -31,6 +34,24 @@ public class ComplaintService {
     }
 
     public Complaint createComplaint(Complaint complaint) {
+        // Validate that a user is set
+        if (complaint.getUser() == null) {
+            throw new IllegalArgumentException("Complaint must be associated with a user");
+        }
+
+        // Validate that the user exists in the database
+        if (complaint.getUser().getId() == null || complaint.getUser().getId() <= 0) {
+            throw new IllegalArgumentException("Invalid user ID: user must be a valid persisted entity");
+        }
+
+        Optional<User> userOptional = userRepository.findById(complaint.getUser().getId());
+        if (userOptional.isEmpty()) {
+            throw new IllegalArgumentException("User not found with ID: " + complaint.getUser().getId());
+        }
+
+        // Ensure we use the fully loaded user object from the database
+        complaint.setUser(userOptional.get());
+
         complaint.setStatus("SUBMITTED");
         complaint.setCreatedAt(LocalDateTime.now());
         complaint.setUpdatedAt(LocalDateTime.now());

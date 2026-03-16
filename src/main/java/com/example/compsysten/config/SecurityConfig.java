@@ -48,6 +48,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
@@ -61,11 +62,15 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
+            .securityContext(securityContext -> securityContext
+                .requireExplicitSave(false)
+            )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.IF_REQUIRED)
             )
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/", "/api/auth/register", "/api/auth/login", "/api/auth/debug", "/api/complaints/**").permitAll()
+                .requestMatchers("/", "/api/auth/register", "/api/auth/login", "/api/auth/debug", "/api/auth/user", "/api/auth/logout").permitAll()
+                .requestMatchers("/api/complaints/**").authenticated()
                 .anyRequest().authenticated()
             );
 
