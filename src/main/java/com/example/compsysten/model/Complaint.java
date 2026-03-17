@@ -20,8 +20,9 @@ public class Complaint {
     @Column(nullable = false)
     private String category;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private ComplaintStatus status;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -37,7 +38,7 @@ public class Complaint {
     public Complaint() {
     }
 
-    public Complaint(String title, String description, String category, String status,
+    public Complaint(String title, String description, String category, ComplaintStatus status,
                      LocalDateTime createdAt, LocalDateTime updatedAt, User user) {
         this.title = title;
         this.description = description;
@@ -81,11 +82,11 @@ public class Complaint {
         this.category = category;
     }
 
-    public String getStatus() {
+    public ComplaintStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(ComplaintStatus status) {
         this.status = status;
     }
 

@@ -35,7 +35,7 @@ public class AdminController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<User> getAdminById(@PathVariable Long id) {
+    public ResponseEntity<User> getAdminById(@PathVariable("id") Long id) {
         Optional<User> admin = userRepository.findById(id);
         return admin.map(value -> new ResponseEntity<>(value, HttpStatus.OK))
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
@@ -53,7 +53,7 @@ public class AdminController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteAdmin(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteAdmin(@PathVariable("id") Long id) {
         if (userRepository.existsById(id)) {
             userRepository.deleteById(id);
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);

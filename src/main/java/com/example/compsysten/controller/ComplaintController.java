@@ -1,7 +1,10 @@
 package com.example.compsysten.controller;
 
 import com.example.compsysten.dto.ComplaintDTO;
+import com.example.compsysten.dto.ComplaintResponseDTO;
+import com.example.compsysten.dto.StatusUpdateRequest;
 import com.example.compsysten.model.Complaint;
+import com.example.compsysten.model.ComplaintStatus;
 import com.example.compsysten.model.User;
 import com.example.compsysten.security.CustomUserDetails;
 import com.example.compsysten.service.ComplaintService;
@@ -14,7 +17,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import com.example.compsysten.dto.ComplaintResponseDTO;
 
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,9 @@ public class ComplaintController {
         this.complaintService = complaintService;
     }
 
+    // -------------------------------------------------------------------------
+    // POST /api/complaints  – STUDENT creates a complaint
+    // -------------------------------------------------------------------------
     @PostMapping
     public ResponseEntity<?> createComplaint(@Valid @RequestBody ComplaintDTO complaintDTO) {
         try {
@@ -66,14 +71,13 @@ public class ComplaintController {
             logger.info("User authenticated: {} (ID: {}), Role: {}", user.getEmail(), user.getId(), user.getRole());
             logger.info("User authorities: {}", userDetails.getAuthorities());
 
-            // Verify user has STUDENT role (only students can file complaints)
+            // Only students can file complaints
             if (!user.getRole().toString().equals("STUDENT")) {
                 logger.warn("User {} tried to file complaint with role {}", user.getEmail(), user.getRole());
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(Map.of("error", "Only students can file complaints. Your role is: " + user.getRole()));
             }
 
-            // Create complaint from DTO and associate with authenticated user
             Complaint complaint = new Complaint();
             complaint.setTitle(complaintDTO.getTitle());
             complaint.setDescription(complaintDTO.getDescription());
@@ -96,6 +100,9 @@ public class ComplaintController {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // GET /api/complaints  – ADMIN gets all complaints
+    // -------------------------------------------------------------------------
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<ComplaintResponseDTO>> getAllComplaints() {
@@ -107,7 +114,7 @@ public class ComplaintController {
                         complaint.getTitle(),
                         complaint.getDescription(),
                         complaint.getCategory(),
-                        complaint.getStatus(),
+                        complaint.getStatus() != null ? complaint.getStatus().name() : null,
                         complaint.getCreatedAt(),
                         complaint.getUser() != null ? complaint.getUser().getName() : "Unknown",
                         complaint.getUser() != null ? complaint.getUser().getEmail() : "Unknown"
@@ -117,8 +124,11 @@ public class ComplaintController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
+    // -------------------------------------------------------------------------
+    // GET /api/complaints/user  – STUDENT views their own complaints
+    // -------------------------------------------------------------------------
     @GetMapping("/user")
-    public ResponseEntity<List<Complaint>> getUserComplaints() {
+    public ResponseEntity<?> getUserComplaints() {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             logger.info("GET /api/complaints/user - Authentication: {}", authentication);
@@ -144,7 +154,6 @@ public class ComplaintController {
             logger.info("User {} attempting to fetch their complaints, Role: {}", user.getEmail(), user.getRole());
             logger.info("User authorities: {}", userDetails.getAuthorities());
 
-            // Verify user has STUDENT role
             if (!user.getRole().toString().equals("STUDENT")) {
                 logger.warn("User {} tried to access student complaints endpoint with role {}", user.getEmail(), user.getRole());
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -152,24 +161,73 @@ public class ComplaintController {
 
             logger.info("User fetching their complaints: {} (ID: {}, Role: {})", user.getEmail(), user.getId(), user.getRole());
 
-            List<Complaint> complaints = complaintService.getComplaintsByUser(user);
+            List<ComplaintResponseDTO> complaints = complaintService.getComplaintsByUser(user)
+                    .stream()
+                    .map(c -> new ComplaintResponseDTO(
+                            c.getId(),
+                            c.getTitle(),
+                            c.getDescription(),
+                            c.getCategory(),
+                            c.getStatus() != null ? c.getStatus().name() : "UNKNOWN",
+                            c.getCreatedAt(),
+                            user.getName(),
+                            user.getEmail()
+                    ))
+                    .toList();
+
             return new ResponseEntity<>(complaints, HttpStatus.OK);
         } catch (Exception e) {
             logger.error("Error in getUserComplaints", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to load complaints: " + e.getMessage()));
         }
     }
 
+    // -------------------------------------------------------------------------
+    // GET /api/complaints/{id}  – view a single complaint
+    // -------------------------------------------------------------------------
     @GetMapping("/{id}")
-    public ResponseEntity<Complaint> getComplaintById(@PathVariable Long id) {
+    public ResponseEntity<Complaint> getComplaintById(@PathVariable("id") Long id) {
         Optional<Complaint> complaint = complaintService.getComplaintById(id);
         return complaint.map(value -> new ResponseEntity<>(value, HttpStatus.OK))
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
+    // -------------------------------------------------------------------------
+    // PATCH /api/complaints/{id}/status  – ADMIN updates complaint status
+    // -------------------------------------------------------------------------
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateComplaintStatus(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody StatusUpdateRequest request) {
+
+        logger.info("PATCH /api/complaints/{}/status - requested status: {}", id, request.getStatus());
+
+        ComplaintStatus newStatus = request.getStatus();
+        Complaint updated = complaintService.updateComplaintStatus(id, newStatus);
+
+        ComplaintResponseDTO response = new ComplaintResponseDTO(
+                updated.getId(),
+                updated.getTitle(),
+                updated.getDescription(),
+                updated.getCategory(),
+                updated.getStatus().name(),
+                updated.getCreatedAt(),
+                updated.getUser() != null ? updated.getUser().getName() : "Unknown",
+                updated.getUser() != null ? updated.getUser().getEmail() : "Unknown"
+        );
+
+        logger.info("Complaint {} status successfully changed to {}", id, newStatus);
+        return ResponseEntity.ok(response);
+    }
+
+    // -------------------------------------------------------------------------
+    // PUT /api/complaints/{id}  – ADMIN full update (existing endpoint)
+    // -------------------------------------------------------------------------
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Complaint> updateComplaint(@PathVariable Long id, @RequestBody Complaint complaintDetails) {
+    public ResponseEntity<Complaint> updateComplaint(@PathVariable("id") Long id, @RequestBody Complaint complaintDetails) {
         Complaint updatedComplaint = complaintService.updateComplaint(id, complaintDetails);
         if (updatedComplaint != null) {
             return new ResponseEntity<>(updatedComplaint, HttpStatus.OK);
@@ -177,9 +235,12 @@ public class ComplaintController {
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
+    // -------------------------------------------------------------------------
+    // DELETE /api/complaints/{id}  – ADMIN deletes a complaint
+    // -------------------------------------------------------------------------
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteComplaint(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteComplaint(@PathVariable("id") Long id) {
         if (complaintService.deleteComplaint(id)) {
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         }

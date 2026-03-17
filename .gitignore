@@ -35,3 +35,14 @@ build/
 .application-local.properties
 *.log
 *.sh
+# Environment / secrets
+.env
+application.properties
+application.yml
+
+# Node (if frontend exists)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

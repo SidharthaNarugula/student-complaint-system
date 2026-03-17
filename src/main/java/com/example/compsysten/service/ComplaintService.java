@@ -1,9 +1,14 @@
 package com.example.compsysten.service;
 
+import com.example.compsysten.exception.ComplaintNotFoundException;
+import com.example.compsysten.exception.InvalidStatusTransitionException;
 import com.example.compsysten.model.Complaint;
+import com.example.compsysten.model.ComplaintStatus;
 import com.example.compsysten.model.User;
 import com.example.compsysten.repository.ComplaintRepository;
 import com.example.compsysten.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -12,6 +17,8 @@ import java.util.Optional;
 
 @Service
 public class ComplaintService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ComplaintService.class);
 
     private final ComplaintRepository complaintRepository;
     private final UserRepository userRepository;
@@ -34,12 +41,10 @@ public class ComplaintService {
     }
 
     public Complaint createComplaint(Complaint complaint) {
-        // Validate that a user is set
         if (complaint.getUser() == null) {
             throw new IllegalArgumentException("Complaint must be associated with a user");
         }
 
-        // Validate that the user exists in the database
         if (complaint.getUser().getId() == null || complaint.getUser().getId() <= 0) {
             throw new IllegalArgumentException("Invalid user ID: user must be a valid persisted entity");
         }
@@ -49,13 +54,48 @@ public class ComplaintService {
             throw new IllegalArgumentException("User not found with ID: " + complaint.getUser().getId());
         }
 
-        // Ensure we use the fully loaded user object from the database
         complaint.setUser(userOptional.get());
-
-        complaint.setStatus("SUBMITTED");
+        complaint.setStatus(ComplaintStatus.OPEN);
         complaint.setCreatedAt(LocalDateTime.now());
         complaint.setUpdatedAt(LocalDateTime.now());
-        return complaintRepository.save(complaint);
+
+        Complaint saved = complaintRepository.save(complaint);
+        logger.info("Complaint created: id={}, title='{}', user={}", saved.getId(), saved.getTitle(),
+                saved.getUser().getEmail());
+        return saved;
+    }
+
+    /**
+     * Transitions a complaint to the requested status, enforcing the state machine rules.
+     * Only valid forward transitions are allowed.
+     *
+     * @param id        complaint to update
+     * @param newStatus the desired next status
+     * @return the updated, persisted complaint
+     * @throws ComplaintNotFoundException       if no complaint exists with the given id
+     * @throws InvalidStatusTransitionException if the transition is not permitted
+     */
+    public Complaint updateComplaintStatus(Long id, ComplaintStatus newStatus) {
+        Complaint complaint = complaintRepository.findById(id)
+                .orElseThrow(() -> {
+                    logger.warn("Status update failed – complaint not found: id={}", id);
+                    return new ComplaintNotFoundException(id);
+                });
+
+        ComplaintStatus current = complaint.getStatus();
+
+        if (!current.canTransitionTo(newStatus)) {
+            logger.warn("Invalid status transition for complaint id={}: {} -> {} (allowed: {})",
+                    id, current, newStatus, current.allowedNextStates());
+            throw new InvalidStatusTransitionException(current, newStatus);
+        }
+
+        complaint.setStatus(newStatus);
+        complaint.setUpdatedAt(LocalDateTime.now());
+        Complaint updated = complaintRepository.save(complaint);
+
+        logger.info("Complaint status updated: id={}, {} -> {}", id, current, newStatus);
+        return updated;
     }
 
     public Complaint updateComplaint(Long id, Complaint complaintDetails) {

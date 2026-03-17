@@ -28,7 +28,7 @@ public class StudentController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<User> getStudentById(@PathVariable Long id) {
+    public ResponseEntity<User> getStudentById(@PathVariable("id") Long id) {
         Optional<User> student = userRepository.findById(id);
         return student.map(value -> new ResponseEntity<>(value, HttpStatus.OK))
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
