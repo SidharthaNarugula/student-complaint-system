@@ -74,6 +74,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(
                                 org.springframework.security.config.http.SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(authz -> authz
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/", "/api/auth/register", "/api/auth/login", "/api/auth/debug",
                                 "/api/auth/user", "/api/auth/logout")
                         .permitAll()
