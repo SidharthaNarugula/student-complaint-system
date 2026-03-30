@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: process.env.REACT_APP_API_URL,
   headers: {
     'Content-Type': 'application/json'
   },
@@ -12,12 +12,7 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Only redirect to login if we truly have no authentication
-    // 401: Unauthorized (no valid session)
-    // 403: Forbidden (has session but lacks authorization/role)
-
     if (error.response?.status === 401) {
-      // Truly unauthenticated - clear user data and redirect
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         localStorage.removeItem('user');
@@ -25,13 +20,8 @@ api.interceptors.response.use(
       }
     }
 
-    // 403 (authorization/role failure) should NOT cause redirect
-    // Let the component handle it and display an error message
-
     return Promise.reject(error);
   }
 );
 
 export default api;
-
-
