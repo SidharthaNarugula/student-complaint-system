@@ -76,7 +76,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/", "/api/auth/register", "/api/auth/login", "/api/auth/debug",
-                                "/api/auth/user", "/api/auth/logout")
+                                "/api/auth/user", "/api/auth/logout", "/api/ai/analyze")
                         .permitAll()
                         .requestMatchers("/api/complaints/**").authenticated()
                         .anyRequest().authenticated())
